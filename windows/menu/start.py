@@ -2,6 +2,7 @@ import arcade
 import random
 import os
 import arcade.resources
+from windows.menu.menu_window import WindowMenu
 
 
 TANK_FILENAMES = [
@@ -65,9 +66,6 @@ class MenuView(arcade.View):
         self.time = 0
         self.blink_timer = 0
         self.show_text = True
-
-        print(f"Разрешение: {self.window.width} × {self.window.height}")
-        print(f"Танков на фоне: {len(self.floating_tanks)}")
 
     def on_show_view(self):
         arcade.set_background_color((10, 18, 35))
@@ -146,7 +144,9 @@ class MenuView(arcade.View):
 
     def on_key_press(self, symbol: int, modifiers: int):
         if symbol == arcade.key.SPACE:
-            print("→ Переход в игру (пока заглушка)")
+            menu_view = WindowMenu()
+            menu_view.setup()
+            self.window.show_view(menu_view)
         if symbol == arcade.key.ESCAPE:
             arcade.close_window()
 
