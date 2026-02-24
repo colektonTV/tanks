@@ -4,7 +4,7 @@ class Button:
     def __init__(self, text, x, y, width=100, height=150, 
                  color=(0, 0, 0), hover_color=(100, 100, 100),
                  click_color=(150, 150, 150), color2=(255, 255, 255),
-                 callback=None):  # Добавляем функцию обратного вызова
+                 callback=None):
         self.text = text
         self.x = x
         self.y = y
@@ -16,7 +16,7 @@ class Button:
         self.color2 = color2
         self.is_hovered = False
         self.is_pressed = False
-        self.callback = callback  # Функция, которая выполнится при клике
+        self.callback = callback
     
     def check_hover(self, mouse_x, mouse_y):
         left = self.x - self.width // 2
@@ -26,20 +26,19 @@ class Button:
         self.is_hovered = left <= mouse_x <= right and bottom <= mouse_y <= top
     
     def on_mouse_press(self, mouse_x, mouse_y):
-        if self.is_hovered:  # Используем is_hovered вместо повторной проверки
+        if self.is_hovered:
             self.is_pressed = True
             return True
         return False
     
     def on_mouse_release(self):
         if self.is_pressed and self.is_hovered and self.callback:
-            self.callback()  # Вызываем функцию при успешном клике
+            self.callback()
         was_pressed = self.is_pressed
         self.is_pressed = False
         return was_pressed
     
     def draw(self):
-        # Выбираем цвет: нажата > наведена > обычная
         if self.is_pressed:
             current_color = self.click_color
         elif self.is_hovered:
@@ -47,14 +46,12 @@ class Button:
         else:
             current_color = self.color
         
-        # Рисуем прямоугольник
         arcade.draw_rect_filled(
             arcade.rect.XYWH(self.x, self.y, self.width, self.height), 
             current_color
         )
         
-        # Рисуем текст (с адаптивным размером шрифта)
-        font_size = min(17, self.width // 6)  # Адаптивный размер шрифта
+        font_size = min(17, self.width // 6)
         text_obj = arcade.Text(
             self.text,
             self.x,

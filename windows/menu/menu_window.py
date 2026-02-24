@@ -3,6 +3,7 @@ from arcade.gui import UIManager, UIFlatButton
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 import random
 from windows.buttons.button import Button
+from windows.menu.settings import Settings
 
 TANK_FILENAMES = [
     "tank_dark.png",
@@ -62,7 +63,7 @@ class WindowMenu(arcade.View):
         super().__init__()
         self.manager = None
         self.floating_tanks = []
-        self.button = Button("Настройки", self.window.height // 2, self.window.width // 2, 300, 60, color=(0, 0, 0), hover_color=(100, 100, 255), click_color=(255,255,255))
+        self.buttons = []
 
     def setup(self):
         base_count = 12
@@ -75,69 +76,65 @@ class WindowMenu(arcade.View):
         self.manager = UIManager()
         self.manager.enable()
 
-        button_box = UIBoxLayout(vertical=True, space_between=20)
-
-        self._add_buttons(button_box)
-
-        anchor = UIAnchorLayout()
-        anchor.add(button_box, anchor_x="center_x", anchor_y="center_y")
-        self.manager.add(anchor)
-
         center_x = self.window.width // 2
         center_y = self.window.height // 2
-        self.button = Button(
+        
+        self.button_play = Button(
+            "Играть", 
+            center_x, 
+            center_y + 70, 
+            300, 
+            60, 
+            color=(186, 183, 182), 
+            color2=(0, 0, 0), 
+            hover_color=(144, 144, 144), 
+            click_color=(255,255,255),
+            callback=self.on_play_click
+        )
+        
+        self.button_settings = Button(
             "Настройки", 
             center_x, 
             center_y, 
             300, 
             60, 
-            color=(0, 0, 0), 
-            hover_color=(100, 100, 255), 
-            click_color=(255, 255, 255)
+            color=(186, 183, 182), 
+            color2=(0, 0, 0), 
+            hover_color=(144, 144, 144), 
+            click_color=(255,255,255),
+            callback=self.on_settings_click
         )
+        
+        self.button_exit = Button(
+            "Выйти", 
+            center_x, 
+            center_y - 70, 
+            300, 
+            60, 
+            color=(186, 183, 182), 
+            color2=(0, 0, 0), 
+            hover_color=(144, 144, 144), 
+            click_color=(255,255,255),
+            callback=self.on_exit_click
+        )
+        
+        self.buttons = [self.button_play, self.button_settings, self.button_exit]
 
-    def _add_buttons(self, button_box):
-        play_btn = UIFlatButton(
-            text="ИГРАТЬ",
-            width=300,
-            height=70,
-            color=arcade.color.WHITE,
-            hover_color=arcade.color.LIGHT_GRAY,
-            press_color=arcade.color.GRAY,
-            text_color=arcade.color.BLACK,
-            text_color_hover=arcade.color.BLACK,
-            text_color_press=arcade.color.BLACK
-        )
-        play_btn.on_click = lambda e: print("-----")
-        button_box.add(play_btn)
-
-        settings_btn = UIFlatButton(
-            text="НАСТРОЙКИ",
-            width=300,
-            height=60,
-            color=arcade.color.WHITE,
-            hover_color=arcade.color.LIGHT_GRAY,
-            press_color=arcade.color.GRAY,
-            text_color=arcade.color.BLACK,
-            text_color_hover=arcade.color.BLACK,
-            text_color_press=arcade.color.BLACK
-        )
-        settings_btn.on_click = lambda e: print("------")
-        button_box.add(settings_btn)
-
-        exit_btn = UIFlatButton(
-            text="ВЫХОД",
-            width=300,
-            height=60,
-            color=arcade.color.WHITE,
-            hover_color=arcade.color.LIGHT_GRAY,
-            press_color=arcade.color.GRAY,
-            text_color=arcade.color.BLACK,
-            text_color_hover=arcade.color.BLACK,
-            text_color_press=arcade.color.BLACK
-        )
-        exit_btn.on_click = lambda e: arcade.exit()
-        button_box.add(exit_btn)
+    def on_play_click(self):
+        pass
+        # game_view = GameView()
+        # game_view.setup()
+        # self.window.show_view(game_view)
+    
+    def on_settings_click(self):
+        print("Настройки нажато!")
+        settings_view = Settings()
+        settings_view.setup()
+        self.window.show_view(settings_view)
+    
+    def on_exit_click(self):
+        print("Выход из игры")
+        arcade.exit()
 
     def on_update(self, delta_time):
         for tank in self.floating_tanks:
@@ -152,18 +149,18 @@ class WindowMenu(arcade.View):
         if self.manager:
             self.manager.draw()
         
-        self.button.draw()
+        for button in self.buttons:
+            button.draw()
     
-
     def on_mouse_motion(self, x, y, dx, dy):
-        self.button.check_hover(x, y)
+        for button in self.buttons:
+            button.check_hover(x, y)
     
     def on_mouse_press(self, x, y, button, modifiers):
         if button == arcade.MOUSE_BUTTON_LEFT:
-            self.button.on_mouse_press(x, y)
-            print("ut")
-
+            for btn in self.buttons:
+                btn.on_mouse_press(x, y)
     
     def on_mouse_release(self, x, y, button, modifiers):
-        if button == arcade.MOUSE_BUTTON_LEFT:
-            self.button.on_mouse_release()
+            for btn in self.buttons:
+                btn.on_mouse_release()
