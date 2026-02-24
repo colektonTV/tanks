@@ -2,7 +2,7 @@ import arcade
 from arcade.gui import UIManager, UIFlatButton
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 import random
-
+from windows.buttons.button import Button
 
 TANK_FILENAMES = [
     "tank_dark.png",
@@ -62,6 +62,7 @@ class WindowMenu(arcade.View):
         super().__init__()
         self.manager = None
         self.floating_tanks = []
+        self.button = Button("Настройки", self.window.height // 2, self.window.width // 2, 300, 60, color=(0, 0, 0), hover_color=(100, 100, 255), click_color=(255,255,255))
 
     def setup(self):
         base_count = 12
@@ -81,6 +82,19 @@ class WindowMenu(arcade.View):
         anchor = UIAnchorLayout()
         anchor.add(button_box, anchor_x="center_x", anchor_y="center_y")
         self.manager.add(anchor)
+
+        center_x = self.window.width // 2
+        center_y = self.window.height // 2
+        self.button = Button(
+            "Настройки", 
+            center_x, 
+            center_y, 
+            300, 
+            60, 
+            color=(0, 0, 0), 
+            hover_color=(100, 100, 255), 
+            click_color=(255, 255, 255)
+        )
 
     def _add_buttons(self, button_box):
         play_btn = UIFlatButton(
@@ -137,3 +151,19 @@ class WindowMenu(arcade.View):
 
         if self.manager:
             self.manager.draw()
+        
+        self.button.draw()
+    
+
+    def on_mouse_motion(self, x, y, dx, dy):
+        self.button.check_hover(x, y)
+    
+    def on_mouse_press(self, x, y, button, modifiers):
+        if button == arcade.MOUSE_BUTTON_LEFT:
+            self.button.on_mouse_press(x, y)
+            print("ut")
+
+    
+    def on_mouse_release(self, x, y, button, modifiers):
+        if button == arcade.MOUSE_BUTTON_LEFT:
+            self.button.on_mouse_release()
