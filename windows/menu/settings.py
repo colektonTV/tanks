@@ -63,9 +63,9 @@ class Settings(arcade.View):
         self.box_layout.add(map_label)
 
         dropdown = UIDropdown(
-            options=["Песочная", "Обычная", "Ночная", "Пустыня"],
+            options=["Песочная", "Обычная"],
             width=280,
-            height=44,
+            height=44
         )
         dropdown.text = self.selected_map
 
