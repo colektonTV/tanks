@@ -3,7 +3,7 @@ from arcade.gui import UIManager
 from windows.buttons.button import Button
 from windows.menu.settings import Settings
 from textures.animation.anim_tank import FloatingTank
-
+from windows.game.game_view import GameView
 
 
 class WindowMenu(arcade.View):
@@ -69,10 +69,9 @@ class WindowMenu(arcade.View):
         self.buttons = [self.button_play, self.button_settings, self.button_exit]
 
     def on_play_click(self):
-        pass
-        # game_view = GameView()
-        # game_view.setup()
-        # self.window.show_view(game_view)
+        game_view = GameView()
+        game_view.setup()
+        self.window.show_view(game_view)
     
     def on_settings_click(self):
         settings_view = Settings(menu_view=self)
