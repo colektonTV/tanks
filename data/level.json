@@ -1,5 +1,5 @@
 {
-  "map": "Песочная",
-  "rounds": 5,
-  "health_multiplier": 3
+  "map": "map_2.tmx",
+  "rounds": 3,
+  "health_multiplier": 1
 }

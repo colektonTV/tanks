@@ -19,7 +19,7 @@ class Settings(arcade.View):
         self.menu_view = menu_view
         extra = max(0, int((self.window.width - 1920) / 400))
         self.floating_tanks = [FloatingTank(self.window) for _ in range(base_count + extra)]
-        self.selected_map = "Песочная"
+        self.selected_map = "map_1.tmx"
         self.rounds = 3
         self.health_multiplier = 1
 
@@ -160,8 +160,13 @@ class Settings(arcade.View):
                         return
 
     def save_settings(self):
+        self.map_selec = ''
+        if self.selected_map == "Песочная":
+            self.map_selec = "map_1.tmx"
+        else:
+            self.map_selec = "map_2.tmx"
         data = {
-            "map": self.selected_map,
+            "map": self.map_selec,
             "rounds": self.rounds,
             "health_multiplier": self.health_multiplier,
         }
