@@ -1,118 +1,222 @@
 import arcade
+import math
 
-# --- Константы ---
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-SCREEN_TITLE = "Танки: Битва на двоих"
-TANK_SPEED = 4
-BULLET_SPEED = 7
+# ================= РАЗРЕШЕНИЕ =================
+SCREEN_WIDTH = 1920
+SCREEN_HEIGHT = 1080
+SCREEN_TITLE = "Tank Battle"
 
-class MyGame(arcade.Window):
-    def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-        arcade.set_background_color(arcade.color.DARK_SLATE_GRAY)
+MOVEMENT_SPEED = 4
+BULLET_SPEED = 10
+TANK_HEALTH = 3  # Заменить на переменную из настроек
 
-        # Списки спрайтов
-        self.player_list = arcade.SpriteList()
-        self.bullet_list = arcade.SpriteList()
-        self.explosion_list = arcade.SpriteList() # Для твоей анимации
 
-        # Танки
-        self.tank_wasd = None
-        self.tank_arrows = None
+# ====================== ПУЛЯ ======================
+class Bullet(arcade.Sprite):
+    def __init__(self, texture, angle, owner):
+        super().__init__(texture, scale=1)
+        self.owner = owner
+        self.angle = angle
+        rad = math.radians(angle)
+        self.change_x = math.cos(rad) * BULLET_SPEED
+        self.change_y = math.sin(rad) * BULLET_SPEED
+
+    def update(self):
+        self.center_x += self.change_x
+        self.center_y += self.change_y
+        if (
+            self.right < 0
+            or self.left > SCREEN_WIDTH
+            or self.top < 0
+            or self.bottom > SCREEN_HEIGHT
+        ):
+            self.remove_from_sprite_lists()
+
+
+# ====================== ИГРА ======================
+class GameView(arcade.View):
+    def on_show_view(self):
+        arcade.set_background_color(arcade.color.BLACK)
+        self.setup()
 
     def setup(self):
-        self.tank_wasd = arcade.Sprite("tank_red.png", scale=1.0)
-        self.tank_wasd.center_x = 150
-        self.tank_wasd.center_y = 300
+        self.player_list = arcade.SpriteList()
+        self.bullet_list = arcade.SpriteList()
 
-        self.tank_arrows = arcade.Sprite("tank_blue.png", scale=1.0)
-        self.tank_arrows.center_x = 650
-        self.tank_arrows.center_y = 300
+        # ================= КАРТА =================
+        map_name = "assets/maps/map.tmx"
+        tile_map = arcade.load_tilemap(map_name, scaling=1)
 
-        self.player_list.append(self.tank_wasd)
-        self.player_list.append(self.tank_arrows)
+        # Авто масштаб карты под экран
+        map_width = tile_map.width * tile_map.tile_width
+        map_height = tile_map.height * tile_map.tile_height
+        scale_x = SCREEN_WIDTH / map_width
+        scale_y = SCREEN_HEIGHT / map_height
+        self.scale = min(scale_x, scale_y)
 
+        tile_map = arcade.load_tilemap(map_name, scaling=self.scale)
+        self.scene = arcade.Scene.from_tilemap(tile_map)
+
+        # Слой коллизий
+        self.wall_list = arcade.SpriteList()
+        if "Collision" in tile_map.object_lists:
+            for obj in tile_map.object_lists["Collision"]:
+                wall = arcade.SpriteSolidColor(
+                    obj.width * self.scale, obj.height * self.scale, arcade.color.GRAY
+                )
+                wall.center_x = obj.center_x * self.scale
+                wall.center_y = obj.center_y * self.scale
+                self.wall_list.append(wall)
+        self.scene.add_sprite_list("Walls", sprite_list=self.wall_list)
+
+        # ================= ТЕКСТУРЫ =================
+        tank1_texture = "assets/tanks/tank1.png"
+        tank2_texture = "assets/tanks/tank2.png"
+        self.bullet_texture = "assets/bullets/bullet.png"
+
+        # ================= СПАВН =================
+        self.tank1 = arcade.Sprite(tank1_texture, scale=1)
+        self.tank1.center_x = 300
+        self.tank1.center_y = SCREEN_HEIGHT // 2
+        self.tank1.health = TANK_HEALTH
+        self.tank1.angle = 0
+
+        self.tank2 = arcade.Sprite(tank2_texture, scale=1)
+        self.tank2.center_x = SCREEN_WIDTH - 300
+        self.tank2.center_y = SCREEN_HEIGHT // 2
+        self.tank2.health = TANK_HEALTH
+        self.tank2.angle = 0
+
+        self.player_list.append(self.tank1)
+        self.player_list.append(self.tank2)
+
+    # ================= РИСОВКА =================
     def on_draw(self):
-        arcade.start_render()
+        self.clear()
+        self.scene.draw()
         self.player_list.draw()
         self.bullet_list.draw()
-        self.explosion_list.draw()
-        
-        if len(self.player_list) < 2:
-            arcade.draw_text("ИГРА ОКОНЧЕНА", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 
-                             arcade.color.WHITE, 30, anchor_x="center")
 
-    def on_key_press(self, key, modifiers):
-        # --- Управление WASD ---
-        if key == arcade.key.W: self.tank_wasd.change_y = TANK_SPEED
-        elif key == arcade.key.S: self.tank_wasd.change_y = -TANK_SPEED
-        elif key == arcade.key.A: self.tank_wasd.change_x = -TANK_SPEED
-        elif key == arcade.key.D: self.tank_wasd.change_x = TANK_SPEED
-        
-        # Стрельба WASD (Space)
-        if key == arcade.key.SPACE and self.tank_wasd.collidable:
-            # 2. ЗАМЕНИ НА СВОЙ ФАЙЛ ПУЛИ
-            bullet = arcade.Sprite("bullet.png", scale=0.5)
-            bullet.center_x = self.tank_wasd.center_x
-            bullet.center_y = self.tank_wasd.center_y
-            bullet.change_x = 8 # Летит вправо (можешь менять логику)
-            self.bullet_list.append(bullet)
+        # HP игроков
+        arcade.draw_text(
+            f"P1 HP: {self.tank1.health}",
+            30,
+            SCREEN_HEIGHT - 40,
+            arcade.color.GREEN,
+            20,
+        )
+        arcade.draw_text(
+            f"P2 HP: {self.tank2.health}",
+            SCREEN_WIDTH - 150,
+            SCREEN_HEIGHT - 40,
+            arcade.color.RED,
+            20,
+        )
 
-        # --- Управление СТРЕЛКИ ---
-        if key == arcade.key.UP: self.tank_arrows.change_y = TANK_SPEED
-        elif key == arcade.key.DOWN: self.tank_arrows.change_y = -TANK_SPEED
-        elif key == arcade.key.LEFT: self.tank_arrows.change_x = -TANK_SPEED
-        elif key == arcade.key.RIGHT: self.tank_arrows.change_x = TANK_SPEED
-
-        # Стрельба Arrows (Enter)
-        if key == arcade.key.ENTER and self.tank_arrows.collidable:
-            bullet = arcade.Sprite("bullet.png", scale=0.5)
-            bullet.center_x = self.tank_arrows.center_x
-            bullet.center_y = self.tank_arrows.center_y
-            bullet.change_x = -8 # Летит влево
-            self.bullet_list.append(bullet)
-
-    def on_key_release(self, key, modifiers):
-        # Остановка WASD
-        if key in (arcade.key.W, arcade.key.S): self.tank_wasd.change_y = 0
-        if key in (arcade.key.A, arcade.key.D): self.tank_wasd.change_x = 0
-        # Остановка Arrows
-        if key in (arcade.key.UP, arcade.key.DOWN): self.tank_arrows.change_y = 0
-        if key in (arcade.key.LEFT, arcade.key.RIGHT): self.tank_arrows.change_x = 0
-
+    # ================= ОБНОВЛЕНИЕ =================
     def on_update(self, delta_time):
         self.player_list.update()
         self.bullet_list.update()
-        self.explosion_list.update() # Обновление анимаций
 
-        # --- Логика попаданий ---
+        # Проверка попаданий
         for bullet in self.bullet_list:
-            # Попали во второго игрока?
-            hit_list_2 = arcade.check_for_collision_with_list(bullet, self.player_list)
-            
-            for hit in hit_list_2:
-                # 3. СЮДА ВСТАВЬ СВОЮ АНИМАЦИЮ ВЗРЫВА
-                # Пример: создание спрайта взрыва на месте попадания
-                # explosion = MyExplosionSprite(self.explosion_textures)
-                # explosion.center_x = hit.center_x
-                # self.explosion_list.append(explosion)
-                
-                hit.remove_from_sprite_lists()
+            if bullet.owner != self.tank1 and arcade.check_for_collision(
+                bullet, self.tank1
+            ):
+                self.tank1.health -= 1
+                bullet.remove_from_sprite_lists()
+            if bullet.owner != self.tank2 and arcade.check_for_collision(
+                bullet, self.tank2
+            ):
+                self.tank2.health -= 1
                 bullet.remove_from_sprite_lists()
 
-            # Удаление пули за экраном
-            if bullet.left > SCREEN_WIDTH or bullet.right < 0:
-                bullet.remove_from_sprite_lists()
+        # Коллизии танков со стенами
+        for tank in [self.tank1, self.tank2]:
+            walls_hit = arcade.check_for_collision_with_list(tank, self.wall_list)
+            for wall in walls_hit:
+                if tank.change_x > 0:
+                    tank.right = wall.left
+                if tank.change_x < 0:
+                    tank.left = wall.right
+                if tank.change_y > 0:
+                    tank.top = wall.bottom
+                if tank.change_y < 0:
+                    tank.bottom = wall.top
 
-        # Границы экрана
-        for tank in self.player_list:
-            if tank.left < 0: tank.left = 0
-            if tank.right > SCREEN_WIDTH: tank.right = SCREEN_WIDTH
-            if tank.bottom < 0: tank.bottom = 0
-            if tank.top > SCREEN_HEIGHT: tank.top = SCREEN_HEIGHT
+        # Проверка смерти
+        if self.tank1.health <= 0:
+            print("Игрок 2 победил")
+            self.window.close()
+        if self.tank2.health <= 0:
+            print("Игрок 1 победил")
+            self.window.close()
 
+    # ================= УПРАВЛЕНИЕ =================
+    def on_key_press(self, key, modifiers):
+        # Игрок 1
+        if key == arcade.key.W:
+            self.tank1.change_y = MOVEMENT_SPEED
+            self.tank1.change_x = 0
+            self.tank1.angle = 90
+        if key == arcade.key.S:
+            self.tank1.change_y = -MOVEMENT_SPEED
+            self.tank1.change_x = 0
+            self.tank1.angle = 270
+        if key == arcade.key.A:
+            self.tank1.change_x = -MOVEMENT_SPEED
+            self.tank1.change_y = 0
+            self.tank1.angle = 180
+        if key == arcade.key.D:
+            self.tank1.change_x = MOVEMENT_SPEED
+            self.tank1.change_y = 0
+            self.tank1.angle = 0
+        if key == arcade.key.SPACE:
+            self.shoot(self.tank1)
+
+        # Игрок 2
+        if key == arcade.key.UP:
+            self.tank2.change_y = MOVEMENT_SPEED
+            self.tank2.change_x = 0
+            self.tank2.angle = 90
+        if key == arcade.key.DOWN:
+            self.tank2.change_y = -MOVEMENT_SPEED
+            self.tank2.change_x = 0
+            self.tank2.angle = 270
+        if key == arcade.key.LEFT:
+            self.tank2.change_x = -MOVEMENT_SPEED
+            self.tank2.change_y = 0
+            self.tank2.angle = 180
+        if key == arcade.key.RIGHT:
+            self.tank2.change_x = MOVEMENT_SPEED
+            self.tank2.change_y = 0
+            self.tank2.angle = 0
+        if key == arcade.key.ENTER:
+            self.shoot(self.tank2)
+
+    def on_key_release(self, key, modifiers):
+        # Игрок 1
+        if key in (arcade.key.W, arcade.key.S):
+            self.tank1.change_y = 0
+        if key in (arcade.key.A, arcade.key.D):
+            self.tank1.change_x = 0
+        # Игрок 2
+        if key in (arcade.key.UP, arcade.key.DOWN):
+            self.tank2.change_y = 0
+        if key in (arcade.key.LEFT, arcade.key.RIGHT):
+            self.tank2.change_x = 0
+
+    # ================= СТРЕЛЬБА =================
+    def shoot(self, tank):
+        bullet = Bullet(self.bullet_texture, tank.angle, tank)
+        bullet.center_x = tank.center_x
+        bullet.center_y = tank.center_y
+        self.bullet_list.append(bullet)
+
+
+# ================== ЗАПУСК ==================
 if __name__ == "__main__":
-    game = MyGame()
-    game.setup()
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    game = GameView()
+    window.show_view(game)
     arcade.run()
