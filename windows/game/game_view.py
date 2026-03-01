@@ -9,9 +9,8 @@ BULLET_SPEED = 7
 
 class GameView(arcade.View):
     def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-        arcade.set_background_color(arcade.color.DARK_SLATE_GRAY)
-
+        super().__init__()  # Убрали лишние аргументы!
+        
         # Списки спрайтов
         self.player_list = arcade.SpriteList()
         self.bullet_list = arcade.SpriteList()
@@ -22,12 +21,18 @@ class GameView(arcade.View):
         self.tank_arrows = None
 
     def setup(self):
+        # Создаем окно, если его еще нет
+        if not self.window:
+            self.window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+        
+        arcade.set_background_color(arcade.color.DARK_SLATE_GRAY)
+        
         # 1. ЗАМЕНИ НА СВОИ ФАЙЛЫ ТАНКОВ
-        self.tank_wasd = arcade.Sprite("tank_red.png", scale=1.0)
+        self.tank_wasd = arcade.Sprite(":tanks:tank_red.png", scale=1.0)
         self.tank_wasd.center_x = 150
         self.tank_wasd.center_y = 300
 
-        self.tank_arrows = arcade.Sprite("tank_blue.png", scale=1.0)
+        self.tank_arrows = arcade.Sprite(":tank:tank_blue.png", scale=1.0)
         self.tank_arrows.center_x = 650
         self.tank_arrows.center_y = 300
 
@@ -41,8 +46,11 @@ class GameView(arcade.View):
         self.explosion_list.draw()
         
         if len(self.player_list) < 2:
-            arcade.draw_text("ИГРА ОКОНЧЕНА", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 
-                             arcade.color.WHITE, 30, anchor_x="center")
+            # Используем Text объект вместо draw_text для лучшей производительности
+            text = arcade.Text("ИГРА ОКОНЧЕНА", 
+                              SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 
+                              arcade.color.WHITE, 30, anchor_x="center")
+            text.draw()
 
     def on_key_press(self, key, modifiers):
         # --- Управление WASD ---
@@ -52,9 +60,9 @@ class GameView(arcade.View):
         elif key == arcade.key.D: self.tank_wasd.change_x = TANK_SPEED
         
         # Стрельба WASD (Space)
-        if key == arcade.key.SPACE and self.tank_wasd.collidable:
+        if key == arcade.key.SPACE and self.tank_wasd in self.player_list:
             # 2. ЗАМЕНИ НА СВОЙ ФАЙЛ ПУЛИ
-            bullet = arcade.Sprite("bullet.png", scale=0.5)
+            bullet = arcade.Sprite(":tank:bulletDark2_outline.png", scale=0.5)
             bullet.center_x = self.tank_wasd.center_x
             bullet.center_y = self.tank_wasd.center_y
             bullet.change_x = 8 # Летит вправо (можешь менять логику)
@@ -67,8 +75,8 @@ class GameView(arcade.View):
         elif key == arcade.key.RIGHT: self.tank_arrows.change_x = TANK_SPEED
 
         # Стрельба Arrows (Enter)
-        if key == arcade.key.ENTER and self.tank_arrows.collidable:
-            bullet = arcade.Sprite("bullet.png", scale=0.5)
+        if key == arcade.key.ENTER and self.tank_arrows in self.player_list:
+            bullet = arcade.Sprite(":tank:bulletDark2_outline.png", scale=0.5)
             bullet.center_x = self.tank_arrows.center_x
             bullet.center_y = self.tank_arrows.center_y
             bullet.change_x = -8 # Летит влево
@@ -90,9 +98,9 @@ class GameView(arcade.View):
         # --- Логика попаданий ---
         for bullet in self.bullet_list:
             # Попали во второго игрока?
-            hit_list_2 = arcade.check_for_collision_with_list(bullet, self.player_list)
+            hit_list = arcade.check_for_collision_with_list(bullet, self.player_list)
             
-            for hit in hit_list_2:
+            for hit in hit_list:
                 # 3. СЮДА ВСТАВЬ СВОЮ АНИМАЦИЮ ВЗРЫВА
                 # Пример: создание спрайта взрыва на месте попадания
                 # explosion = MyExplosionSprite(self.explosion_textures)
@@ -101,6 +109,7 @@ class GameView(arcade.View):
                 
                 hit.remove_from_sprite_lists()
                 bullet.remove_from_sprite_lists()
+                break  # Пуля уничтожена, выходим из цикла
 
             # Удаление пули за экраном
             if bullet.left > SCREEN_WIDTH or bullet.right < 0:
