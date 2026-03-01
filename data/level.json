@@ -1,5 +1,5 @@
 {
-  "map": "map_2.tmx",
-  "rounds": 8,
-  "health_multiplier": 1
+  "map": "map_1.tmx",
+  "rounds": 6,
+  "health_multiplier": 3
 }
