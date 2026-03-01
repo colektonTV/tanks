@@ -63,7 +63,7 @@ class Settings(arcade.View):
         self.box_layout.add(map_label)
 
         dropdown = UIDropdown(
-            options=["Песочная", "Обычная"],
+            options=["Первая карта", "Вторая карта"],
             width=280,
             height=44
         )
@@ -161,7 +161,7 @@ class Settings(arcade.View):
 
     def save_settings(self):
         self.map_selec = ''
-        if self.selected_map == "Песочная":
+        if self.selected_map == "Первая карта":
             self.map_selec = "map_1.tmx"
         else:
             self.map_selec = "map_2.tmx"
