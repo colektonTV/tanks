@@ -41,7 +41,7 @@ class Pouse(arcade.View):
         )
         
         self.button_exit_menu = Button(
-            "Выйти", 
+            "Меню", 
             center_x, 
             center_y,
             300, 
