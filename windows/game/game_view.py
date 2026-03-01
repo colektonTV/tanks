@@ -1,5 +1,6 @@
 import arcade
 import os
+from windows.game.pouse import Pouse
 import json
 
 # --- Константы ---
@@ -10,8 +11,9 @@ TANK_SPEED = 8  # Увеличил скорость для большого эк
 BULLET_SPEED = 7
 
 class GameView(arcade.View):
-    def __init__(self):
+    def __init__(self, menu):
         super().__init__()
+        self.menu = menu
         with open("data/level.json", "r", encoding="utf-8") as f:
             fs = f.read()
             data = json.loads(fs)
@@ -283,6 +285,11 @@ class GameView(arcade.View):
         # Стрельба Arrows (Enter)
         if key == arcade.key.ENTER:
             self._fire_bullet(self.tank_arrows, -BULLET_SPEED)
+        
+        if key == arcade.key.ESCAPE:
+            pause_view = Pouse(game_view=self, menu=self.menu)
+            pause_view.setup()  # Передаём текущий вид, чтобы вернуться
+            self.window.show_view(pause_view)
 
     def on_key_release(self, key, modifiers):
         if self.tank_wasd in self.player_list:
