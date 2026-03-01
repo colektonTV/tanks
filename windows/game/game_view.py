@@ -6,8 +6,8 @@ import math
 
 # --- Константы ---
 SCREEN_TITLE = "Танки: Битва на двоих"
-TANK_SPEED = 10  # Скорость в пикселях в секунду (будет масштабироваться)
-BULLET_SPEED = 30  # Скорость пули в пикселях в секунду
+TANK_SPEED = 5  # Скорость в пикселях в секунду (будет масштабироваться)
+BULLET_SPEED = 20  # Скорость пули в пикселях в секунду
 
 class GameView(arcade.View):
     def __init__(self, menu):
@@ -360,7 +360,7 @@ class GameView(arcade.View):
         bullet_path = os.path.join(self.project_path, "textures", "sprites", "tanks", "bulletDark2_outline.png")
         
         if os.path.exists(bullet_path):
-            bullet = arcade.Sprite(bullet_path, scale=0.8 * self.global_scale)
+            bullet = arcade.Sprite(bullet_path, scale=2 * self.global_scale)
         else:
             bullet_size = int(20 * self.global_scale)
             bullet = arcade.SpriteSolidColor(bullet_size, bullet_size, arcade.color.YELLOW)
