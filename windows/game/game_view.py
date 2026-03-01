@@ -2,29 +2,47 @@ import arcade
 import os
 from windows.game.pouse import Pouse
 import json
+import math
 
 # --- Константы ---
 SCREEN_WIDTH = 1920  # Full HD ширина
 SCREEN_HEIGHT = 1080  # Full HD высота
 SCREEN_TITLE = "Танки: Битва на двоих"
-TANK_SPEED = 8  # Увеличил скорость для большого экрана
+TANK_SPEED = 3  # Увеличил скорость для большого экрана
 BULLET_SPEED = 7
 
 class GameView(arcade.View):
     def __init__(self, menu):
         super().__init__()
         self.menu = menu
+        
+        # Загрузка карты
         with open("data/level.json", "r", encoding="utf-8") as f:
-            fs = f.read()
-            data = json.loads(fs)
-            map_value = data.get("map")
-            self.select_map = map_value 
+            data = json.load(f)
+            self.select_map = data.get("map")
+        
+        # Загрузка количества раундов
+        try:
+            with open("data/setings.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+                self.max_rounds = data.get("rounds", 1)
+                print(f"Загружено раундов: {self.max_rounds}")
+        except:
+            print("Файл настроек не найден, используется 1 раунд")
+            self.max_rounds = 1
+        
+        # Обязательно создаем эти переменные!
+        self.current_round = 1
+        self.round_timer = 0
+        self.round_delay = 2
+        
         # Списки спрайтов
         self.player_list = arcade.SpriteList()
         self.bullet_list = arcade.SpriteList()
         self.explosion_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList()
         self.collision_list = arcade.SpriteList()
+        self.backgr_list = arcade.SpriteList()
         
         # Камера
         self.camera = None
@@ -35,18 +53,58 @@ class GameView(arcade.View):
         self.map_bottom = 0
         self.map_top = 0
         
-        # Физические движки для каждого танка
+        # Физические движки
         self.physics_engine_wasd = None
         self.physics_engine_arrows = None
-
+        
         # Танки
         self.tank_wasd = None
         self.tank_arrows = None
         
-        # Путь к корневой папке проекта
+        # Путь к корневой папке
         current_dir = os.path.dirname(os.path.abspath(__file__))
         self.project_path = os.path.dirname(os.path.dirname(current_dir))
-        print(f"Корневая папка проекта: {self.project_path}")
+    
+    def _reset_round(self):
+        """Возвращает танки на стартовые позиции"""
+        # Очищаем пули и взрывы
+        self.bullet_list = arcade.SpriteList()
+        self.explosion_list = arcade.SpriteList()
+        
+        # Удаляем старые танки из списка
+        self.player_list = arcade.SpriteList()
+        
+        # Создаем танки заново
+        tank_red_path = os.path.join(self.project_path, "textures", "sprites", "tanks", "tank_red.png")
+        tank_blue_path = os.path.join(self.project_path, "textures", "sprites", "tanks", "tank_blue.png")
+        
+        if self.select_map == "map_1.tmx":
+            tank_scale = 0.8
+        else:
+            tank_scale = 0.6
+        
+        self.tank_wasd = arcade.Sprite(tank_red_path, scale=tank_scale)
+        self.tank_arrows = arcade.Sprite(tank_blue_path, scale=tank_scale)
+        
+        # Позиции
+        map_center_x = (self.map_left + self.map_right) / 2
+        map_width = self.map_right - self.map_left
+        
+        self.tank_wasd.center_x = self.map_left + map_width * 0.25
+        self.tank_wasd.center_y = (self.map_bottom + self.map_top) / 2
+        self.tank_wasd.angle = 0
+        
+        self.tank_arrows.center_x = self.map_left + map_width * 0.75
+        self.tank_arrows.center_y = (self.map_bottom + self.map_top) / 2
+        self.tank_arrows.angle = 0
+        
+        self.player_list.append(self.tank_wasd)
+        self.player_list.append(self.tank_arrows)
+        
+        # Обновляем физику
+        if len(self.collision_list) > 0:
+            self.physics_engine_wasd = arcade.PhysicsEngineSimple(self.tank_wasd, self.collision_list)
+            self.physics_engine_arrows = arcade.PhysicsEngineSimple(self.tank_arrows, self.collision_list)
 
     def setup(self):
         """Настраиваем игру здесь"""
@@ -93,7 +151,6 @@ class GameView(arcade.View):
         self._center_camera()
 
     def _load_map(self):
-        
         """Загружает карту из папки textures/map"""
         map_path = os.path.join(self.project_path, "textures", "map", self.select_map)
         
@@ -108,22 +165,24 @@ class GameView(arcade.View):
                 map_tile_height = 34
                 tile_size = 70
                 
-                # Вычисляем масштаб для заполнения экрана
-                # Оставляем 10% отступов по краям
-                margin_percent = 0.9
+                # Вычисляем масштаб для заполнения всего экрана 1920x1080
+                # Масштаб по ширине и высоте для полного заполнения
+                scale_x = SCREEN_WIDTH / (map_tile_width * tile_size)
+                scale_y = SCREEN_HEIGHT / (map_tile_height * tile_size)
                 
-                # Масштаб по ширине и высоте
-                scale_x = (SCREEN_WIDTH * margin_percent) / (map_tile_width * tile_size)
-                scale_y = (SCREEN_HEIGHT * margin_percent) / (map_tile_height * tile_size)
+                # Берем максимальный масштаб, чтобы карта заполнила весь экран
+                # (может немного выйти за границы, но это лучше, чем пустые поля)
+                scale = max(scale_x, scale_y)
                 
-                # Берём меньший масштаб, чтобы карта полностью поместилась
-                scale = min(scale_x, scale_y)
+                # Если хотите точно вписать в экран без обрезки, используйте min:
+                # scale = min(scale_x, scale_y)
                 
                 print(f"Масштаб карты для Full HD: {scale:.2f}")
                 print(f"Размер карты после масштабирования: {map_tile_width * tile_size * scale:.0f} x {map_tile_height * tile_size * scale:.0f}")
                 
                 # Грузим тайловую карту с вычисленным масштабом
-                tile_map = arcade.load_tilemap(map_path, scaling=scale-0.04)
+                # Убрал -0.04, чтобы точно заполнить экран
+                tile_map = arcade.load_tilemap(map_path, scaling=scale)
                 
                 # Получаем слои из карты
                 if "walls" in tile_map.sprite_lists:
@@ -133,9 +192,10 @@ class GameView(arcade.View):
                 if "colision" in tile_map.sprite_lists:
                     self.collision_list = tile_map.sprite_lists["colision"]
                     print(f"Загружено коллизий: {len(self.collision_list)}")
+                
                 if "backgr" in tile_map.sprite_lists:
-                    self.backgr_list= tile_map.sprite_lists["backgr"]
-                    print(f"Загружено коллизий: {len(self.collision_list)}")
+                    self.backgr_list = tile_map.sprite_lists["backgr"]
+                    print(f"Загружено фона: {len(self.backgr_list)}")
                 elif len(self.wall_list) > 0:
                     self.collision_list = self.wall_list
                     print("Слой colision не найден, использую walls для коллизий")
@@ -216,12 +276,38 @@ class GameView(arcade.View):
         self.player_list.append(self.tank_wasd)
         self.player_list.append(self.tank_arrows)
 
-    def _fire_bullet(self, tank, direction_x):
-        """Создаёт пулю"""
-        bullet = arcade.SpriteSolidColor(15, 8, arcade.color.YELLOW)  # Увеличил пули для Full HD
-        bullet.center_x = tank.center_x
-        bullet.center_y = tank.center_y
-        bullet.change_x = direction_x
+    def _fire_bullet(self, tank, speed=BULLET_SPEED):
+        """Создает пулю в направлении танка"""
+        bullet_path = os.path.join(self.project_path, "textures", "sprites", "tanks", "bulletDark2_outline.png")
+        
+        bullet = arcade.Sprite(bullet_path, scale=0.8)
+        
+        # Определяем направление по углу танка
+        if tank.angle == 180:  # вверх
+            bullet.center_x = tank.center_x
+            bullet.center_y = tank.center_y + 40
+            bullet.change_x = 0
+            bullet.change_y = speed
+            bullet.angle = 180  # острием вверх
+        elif tank.angle == 360 or tank.angle == 0:  # вниз
+            bullet.center_x = tank.center_x
+            bullet.center_y = tank.center_y - 40
+            bullet.change_x = 0
+            bullet.change_y = -speed
+            bullet.angle = 0  # острием вниз
+        elif tank.angle == 90:  # влево
+            bullet.center_x = tank.center_x - 40
+            bullet.center_y = tank.center_y
+            bullet.change_x = -speed
+            bullet.change_y = 0
+            bullet.angle = 90  # острием влево
+        elif tank.angle == 270:  # вправо
+            bullet.center_x = tank.center_x + 40
+            bullet.center_y = tank.center_y
+            bullet.change_x = speed
+            bullet.change_y = 0
+            bullet.angle = 270  # острием вправо
+        
         self.bullet_list.append(bullet)
 
     def _keep_tank_in_bounds(self, tank):
@@ -250,45 +336,67 @@ class GameView(arcade.View):
         
         # Рисуем UI поверх всего (без камеры)
         if len(self.player_list) < 2:
-            arcade.draw_text("ИГРА ОКОНЧЕНА", 
-                           SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 
-                           arcade.color.WHITE, 50, anchor_x="center")  # Увеличил шрифт
+            if self.current_round < self.max_rounds:
+                arcade.draw_text("МАТЧ ОКОНЧЕН!", 
+                            SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 
+                            arcade.color.WHITE, 50, anchor_x="center")
+            else:
+                arcade.draw_text("ИГРА ОКОНЧЕНА", 
+                            SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 
+                            arcade.color.WHITE, 50, anchor_x="center")
 
     def on_key_press(self, key, modifiers):
         if self.tank_wasd not in self.player_list or self.tank_arrows not in self.player_list:
             return
-            
-        # --- Управление WASD ---
-        if key == arcade.key.W: 
+
+        # --- Управление танком WASD ---
+        if key == arcade.key.W:
             self.tank_wasd.change_y = TANK_SPEED
-        elif key == arcade.key.S: 
+            self.tank_wasd.change_x = 0
+            self.tank_wasd.angle = 180  # вверх
+        elif key == arcade.key.S:
             self.tank_wasd.change_y = -TANK_SPEED
-        elif key == arcade.key.A: 
+            self.tank_wasd.change_x = 0
+            self.tank_wasd.angle = 360  # вниз
+        elif key == arcade.key.A:
             self.tank_wasd.change_x = -TANK_SPEED
-        elif key == arcade.key.D: 
+            self.tank_wasd.change_y = 0
+            self.tank_wasd.angle = 90  # влево
+        elif key == arcade.key.D:
             self.tank_wasd.change_x = TANK_SPEED
-        
-        # Стрельба WASD (Space)
+            self.tank_wasd.change_y = 0
+            self.tank_wasd.angle = 270  # вправо
+
+        # Стрельба для танка WASD
         if key == arcade.key.SPACE:
-            self._fire_bullet(self.tank_wasd, BULLET_SPEED)
+            self._fire_bullet(self.tank_wasd)
 
-        # --- Управление СТРЕЛКИ ---
-        if key == arcade.key.UP: 
+        # --- Управление танком стрелками ---
+        if key == arcade.key.UP:
             self.tank_arrows.change_y = TANK_SPEED
-        elif key == arcade.key.DOWN: 
+            self.tank_arrows.change_x = 0
+            self.tank_arrows.angle = 180  # вверх
+        elif key == arcade.key.DOWN:
             self.tank_arrows.change_y = -TANK_SPEED
-        elif key == arcade.key.LEFT: 
+            self.tank_arrows.change_x = 0
+            self.tank_arrows.angle = 360  # вниз
+        elif key == arcade.key.LEFT:
             self.tank_arrows.change_x = -TANK_SPEED
-        elif key == arcade.key.RIGHT: 
+            self.tank_arrows.change_y = 0
+            self.tank_arrows.angle = 90  # влево
+        elif key == arcade.key.RIGHT:
             self.tank_arrows.change_x = TANK_SPEED
+            self.tank_arrows.change_y = 0
+            self.tank_arrows.angle = 270  # вправо
 
-        # Стрельба Arrows (Enter)
+        # Стрельба для танка стрелками
         if key == arcade.key.ENTER:
-            self._fire_bullet(self.tank_arrows, -BULLET_SPEED)
-        
+            self._fire_bullet(self.tank_arrows)
+
+        # Пауза
         if key == arcade.key.ESCAPE:
             pause_view = Pouse(game_view=self, menu=self.menu)
-            pause_view.setup()  # Передаём текущий вид, чтобы вернуться
+            pause_view.setup()
             self.window.show_view(pause_view)
 
     def on_key_release(self, key, modifiers):
@@ -324,19 +432,15 @@ class GameView(arcade.View):
 
         # --- Логика попаданий ---
         bullets_to_remove = []
-        
+
         for bullet in self.bullet_list:
             # Проверяем столкновение с игроками
             hit_list = arcade.check_for_collision_with_list(bullet, self.player_list)
             
             for hit in hit_list:
+                # Удаляем танк
                 hit.remove_from_sprite_lists()
                 bullets_to_remove.append(bullet)
-                
-                explosion = arcade.SpriteSolidColor(40, 40, arcade.color.ORANGE)  # Увеличил взрыв
-                explosion.center_x = hit.center_x
-                explosion.center_y = hit.center_y
-                self.explosion_list.append(explosion)
                 break
 
             # Проверяем столкновение со стенами
@@ -352,7 +456,14 @@ class GameView(arcade.View):
                     bullet.bottom > self.map_top + 100 or 
                     bullet.top < self.map_bottom - 100):
                     bullets_to_remove.append(bullet)
-        
+
         for bullet in bullets_to_remove:
             if bullet in self.bullet_list:
                 bullet.remove_from_sprite_lists()
+        
+        # ПРОВЕРКА РАУНДА - теперь здесь, после всех циклов
+        if len(self.player_list) < 2:
+            if self.current_round < self.max_rounds:
+                self.current_round += 1
+                print(f"Раунд {self.current_round}")
+                self._reset_round()
