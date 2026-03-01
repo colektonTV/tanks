@@ -22,7 +22,6 @@ class MyGame(arcade.Window):
         self.tank_arrows = None
 
     def setup(self):
-        # 1. ЗАМЕНИ НА СВОИ ФАЙЛЫ ТАНКОВ
         self.tank_wasd = arcade.Sprite("tank_red.png", scale=1.0)
         self.tank_wasd.center_x = 150
         self.tank_wasd.center_y = 300
