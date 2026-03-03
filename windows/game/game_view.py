@@ -1,10 +1,70 @@
 import arcade
 import os
 import json
+import random
+import math
 from windows.game.pouse import Pouse
+from arcade.particles import FadeParticle, Emitter, EmitBurst
+from arcade import SpriteList, Sprite, Camera2D, PhysicsEngineSimple
+from arcade import draw_text, set_background_color, color
+from arcade import check_for_collision_with_list
+from arcade import load_tilemap
 
 TANK_SPEED = 5
 BULLET_SPEED = 20
+
+SPARK_TEX = [
+    arcade.make_soft_circle_texture(8, arcade.color.PASTEL_YELLOW),
+    arcade.make_soft_circle_texture(8, arcade.color.PEACH),
+    arcade.make_soft_circle_texture(8, arcade.color.BABY_BLUE),
+    arcade.make_soft_circle_texture(8, arcade.color.ELECTRIC_CRIMSON),
+]
+
+SMOKE_TEX = arcade.make_soft_circle_texture(20, arcade.color.LIGHT_GRAY, 255, 80)
+
+
+def gravity_drag(p):
+    p.change_y += -0.03
+    p.change_x *= 0.92
+    p.change_y *= 0.92
+
+
+def smoke_mutator(p):
+    p.scale_x *= 1.02
+    p.scale_y *= 1.02
+    p.alpha = max(0, p.alpha - 2)
+
+
+def make_explosion(x, y, count=80):
+    return Emitter(
+        center_xy=(x, y),
+        emit_controller=EmitBurst(count),
+        particle_factory=lambda e: FadeParticle(
+            filename_or_texture=random.choice(SPARK_TEX),
+            change_xy=arcade.math.rand_in_circle((0.0, 0.0), 9.0),
+            lifetime=random.uniform(0.5, 1.1),
+            start_alpha=255,
+            end_alpha=0,
+            scale=random.uniform(0.35, 0.6),
+            mutation_callback=gravity_drag,
+        ),
+    )
+
+
+def make_smoke_puff(x, y):
+    return Emitter(
+        center_xy=(x, y),
+        emit_controller=EmitBurst(12),
+        particle_factory=lambda e: FadeParticle(
+            filename_or_texture=SMOKE_TEX,
+            change_xy=arcade.math.rand_in_circle((0.0, 0.0), 0.6),
+            lifetime=random.uniform(1.5, 2.5),
+            start_alpha=200,
+            end_alpha=0,
+            scale=random.uniform(0.6, 0.9),
+            mutation_callback=smoke_mutator,
+        ),
+    )
 
 
 class GameView(arcade.View):
@@ -28,7 +88,7 @@ class GameView(arcade.View):
             with open("data/level.json", "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self.max_rounds = data.get("rounds", 1)
-        except:
+        except Exception:
             self.max_rounds = 1
 
         self.current_round = 1
@@ -42,7 +102,7 @@ class GameView(arcade.View):
 
         self.player_list = arcade.SpriteList()
         self.bullet_list = arcade.SpriteList()
-        self.explosion_list = arcade.SpriteList()
+        self.emitters = []
         self.wall_list = arcade.SpriteList()
         self.collision_list = arcade.SpriteList()
         self.backgr_list = arcade.SpriteList()
@@ -67,6 +127,20 @@ class GameView(arcade.View):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         self.project_path = os.path.dirname(os.path.dirname(current_dir))
 
+        self.shoot_sound = arcade.load_sound(":resources:/sounds/laser1.wav")
+        self.explosion_sound = arcade.load_sound(":resources:/sounds/explosion1.wav")
+        self.background_music = arcade.load_sound(":resources:/music/funkyrobot.mp3")
+        self.background_player = None
+
+    def on_show_view(self):
+        if self.background_music:
+            self.background_player = self.background_music.play(looping=True, volume=0.3)
+
+    def on_hide_view(self):
+        if self.background_player:
+            arcade.stop_sound(self.background_player)
+            self.background_player = None
+
     def _calculate_scale(self):
         map_tile_width = 60
         map_tile_height = 34
@@ -87,7 +161,7 @@ class GameView(arcade.View):
 
     def _reset_round(self):
         self.bullet_list = arcade.SpriteList()
-        self.explosion_list = arcade.SpriteList()
+        self.emitters = []
         self.health_red = self.health
         self.health_blue = self.health
         self.flag_deacrivate = False
@@ -113,7 +187,7 @@ class GameView(arcade.View):
 
         self.player_list = arcade.SpriteList()
         self.bullet_list = arcade.SpriteList()
-        self.explosion_list = arcade.SpriteList()
+        self.emitters = []
         self.wall_list = arcade.SpriteList()
         self.collision_list = arcade.SpriteList()
         self.backgr_list = arcade.SpriteList()
@@ -330,6 +404,9 @@ class GameView(arcade.View):
 
         self.bullet_list.append(bullet)
 
+        if self.shoot_sound:
+            self.shoot_sound.play(volume=0.5)
+
     def _keep_tank_in_bounds(self, tank):
         if tank.left < self.map_left:
             tank.left = self.map_left
@@ -348,45 +425,47 @@ class GameView(arcade.View):
             self.wall_list.draw()
             self.player_list.draw()
             self.bullet_list.draw()
-            self.explosion_list.draw()
 
-        arcade.draw_text(
+            for emitter in self.emitters:
+                emitter.draw()
+
+        draw_text(
             f"КРАСНЫЙ: {self.score_wasd}",
             20,
             self.screen_height - 50,
-            arcade.color.RED,
+            color.RED,
             24,
             bold=True,
         )
-        arcade.draw_text(
+        draw_text(
             f"СИНИЙ: {self.score_arrows}",
             20,
             self.screen_height - 80,
-            arcade.color.BLUE,
+            color.BLUE,
             24,
             bold=True,
         )
-        arcade.draw_text(
+        draw_text(
             f"РАУНД: {self.current_round}/{self.max_rounds}",
             self.screen_width - 200,
             self.screen_height - 50,
-            arcade.color.WHITE,
+            color.WHITE,
             24,
             bold=True,
         )
-        arcade.draw_text(
+        draw_text(
             f"Здоровье КРАСНЫЙ: {self.health_red}",
             self.screen_width - 400,
             50,
-            arcade.color.RED,
+            color.RED,
             24,
             bold=True,
         )
-        arcade.draw_text(
+        draw_text(
             f"Здоровье СИНИЙ: {self.health_blue}",
             self.screen_width - 400,
             20,
-            arcade.color.BLUE,
+            color.BLUE,
             24,
             bold=True,
         )
@@ -397,13 +476,13 @@ class GameView(arcade.View):
                 and self.current_round < self.max_rounds
             ):
                 if self.round_winner == "wasd":
-                    winner_color = arcade.color.RED
+                    winner_color = color.RED
                     winner_text = "КРАСНЫЙ"
                 else:
-                    winner_color = arcade.color.BLUE
+                    winner_color = color.BLUE
                     winner_text = "СИНИЙ"
 
-                arcade.draw_text(
+                draw_text(
                     f"{winner_text} ВЫИГРАЛ РАУНД!",
                     self.screen_width / 2,
                     self.screen_height / 2 + 50,
@@ -412,11 +491,11 @@ class GameView(arcade.View):
                     anchor_x="center",
                     bold=True,
                 )
-                arcade.draw_text(
+                draw_text(
                     f"Следующий раунд через {max(0, int(self.round_delay - self.round_timer + 1))}...",
                     self.screen_width / 2,
                     self.screen_height / 2 - 20,
-                    arcade.color.WHITE,
+                    color.WHITE,
                     30,
                     anchor_x="center",
                 )
@@ -424,15 +503,15 @@ class GameView(arcade.View):
         if self.current_round > self.max_rounds:
             if self.score_wasd > self.score_arrows:
                 winner_text = "КРАСНЫЙ ПОБЕДИЛ В ИГРЕ!"
-                winner_color = arcade.color.RED
+                winner_color = color.RED
             elif self.score_arrows > self.score_wasd:
                 winner_text = "СИНИЙ ПОБЕДИЛ В ИГРЕ!"
-                winner_color = arcade.color.BLUE
+                winner_color = color.BLUE
             else:
                 winner_text = "НИЧЬЯ!"
-                winner_color = arcade.color.WHITE
+                winner_color = color.WHITE
 
-            arcade.draw_text(
+            draw_text(
                 winner_text,
                 self.screen_width / 2,
                 self.screen_height / 2,
@@ -441,11 +520,11 @@ class GameView(arcade.View):
                 anchor_x="center",
                 bold=True,
             )
-            arcade.draw_text(
+            draw_text(
                 "Нажмите ESC для выхода в меню",
                 self.screen_width / 2,
                 self.screen_height / 2 - 60,
-                arcade.color.WHITE,
+                color.WHITE,
                 20,
                 anchor_x="center",
             )
@@ -453,7 +532,7 @@ class GameView(arcade.View):
     def on_key_press(self, key, modifiers):
         if self.current_round > self.max_rounds:
             if key == arcade.key.ESCAPE:
-                arcade.set_background_color((10, 18, 35))
+                set_background_color((10, 18, 35))
                 self.window.show_view(self.menu)
 
         if not self.round_active:
@@ -543,7 +622,11 @@ class GameView(arcade.View):
                 self._keep_tank_in_bounds(self.tank_arrows)
 
             self.bullet_list.update()
-            self.explosion_list.update()
+
+            for emitter in self.emitters:
+                emitter.update()
+
+            self.emitters = [e for e in self.emitters if not e.can_reap()]
 
             bullets_to_remove = []
 
@@ -553,6 +636,12 @@ class GameView(arcade.View):
                 )
 
                 for hit in hit_list:
+                    if self.explosion_sound:
+                        self.explosion_sound.play(volume=0.7)
+
+                    self.emitters.append(make_explosion(bullet.center_x, bullet.center_y, 80))
+                    self.emitters.append(make_smoke_puff(bullet.center_x, bullet.center_y))
+
                     if hit == self.tank_wasd and int(self.health_red) == 1:
                         self.round_winner = "arrows"
                         self.health_red = 0
@@ -585,6 +674,11 @@ class GameView(arcade.View):
                         bullet, self.collision_list
                     )
                     if wall_hits:
+                        if self.explosion_sound:
+                            self.explosion_sound.play(volume=0.5)
+
+                        self.emitters.append(make_explosion(bullet.center_x, bullet.center_y, 60))
+                        self.emitters.append(make_smoke_puff(bullet.center_x, bullet.center_y))
                         bullets_to_remove.append(bullet)
 
                 if self.backgr_list or self.wall_list:
