@@ -3,7 +3,7 @@ import os
 import json
 import random
 import math
-from windows.game.pouse import Pouse
+from windows.game.pause import Pause
 from arcade.particles import FadeParticle, Emitter, EmitBurst
 from arcade import SpriteList, Sprite, Camera2D, PhysicsEngineSimple
 from arcade import draw_text, set_background_color, color
@@ -587,7 +587,7 @@ class GameView(arcade.View):
             self._fire_bullet(self.tank_arrows)
 
         if key == arcade.key.ESCAPE:
-            pause_view = Pouse(game_view=self, menu=self.menu)
+            pause_view = Pause(game_view=self, menu=self.menu)
             pause_view.setup()
             self.window.show_view(pause_view)
 

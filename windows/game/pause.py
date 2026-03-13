@@ -4,7 +4,7 @@ from textures.animation.anim_tank import FloatingTank
 from windows.buttons.button import Button
 
 
-class Pouse(arcade.View):
+class Pause(arcade.View):
     def __init__(self, game_view, menu):
         super().__init__()
         self.game_view = game_view
