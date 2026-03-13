@@ -2,7 +2,6 @@ import arcade
 import os
 import json
 import random
-import math
 from windows.game.pause import Pause
 from arcade.particles import FadeParticle, Emitter, EmitBurst
 from arcade import SpriteList, Sprite, Camera2D, PhysicsEngineSimple
